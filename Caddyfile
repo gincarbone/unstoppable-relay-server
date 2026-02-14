@@ -1,0 +1,10 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$RELAY_HOST} {
+    encode zstd gzip
+    reverse_proxy /ws relay:8000
+    reverse_proxy /healthz relay:8000
+    reverse_proxy relay:8000
+}
