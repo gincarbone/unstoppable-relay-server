@@ -62,17 +62,21 @@ async def broadcast_announce(source_peer_id: str, source: PeerSession) -> None:
 async def send_punch_pair(a: PeerSession, b: PeerSession) -> None:
     b_candidates = normalize_candidates(b)
     a_candidates = normalize_candidates(a)
+    # Coordinated punch window so both peers start dialing nearly together.
+    punch_at_ms = int(time.time() * 1000) + 600
 
     # v2 payload with multiple candidates (preferred by unstoppable2)
     to_a_v2 = {
         "type": "punch_now_v2",
         "peerId": b.peer_id,
         "candidates": b_candidates,
+        "punchAtEpochMs": punch_at_ms,
     }
     to_b_v2 = {
         "type": "punch_now_v2",
         "peerId": a.peer_id,
         "candidates": a_candidates,
+        "punchAtEpochMs": punch_at_ms,
     }
 
     # Message format expected by Android SignalingClient.handleMessage(...)
@@ -84,6 +88,7 @@ async def send_punch_pair(a: PeerSession, b: PeerSession) -> None:
         "stunIp": b_primary.get("ip", ""),
         "stunPort": b_primary.get("port", 0),
         "udpPort": b_primary.get("udpPort", b_primary.get("port", 0)),
+        "punchAtEpochMs": punch_at_ms,
     }
     to_b = {
         "type": "punch_now",
@@ -91,7 +96,9 @@ async def send_punch_pair(a: PeerSession, b: PeerSession) -> None:
         "stunIp": a_primary.get("ip", ""),
         "stunPort": a_primary.get("port", 0),
         "udpPort": a_primary.get("udpPort", a_primary.get("port", 0)),
+        "punchAtEpochMs": punch_at_ms,
     }
+    logger.info("punch_pair a=%s b=%s punchAtEpochMs=%s", a.peer_id, b.peer_id, punch_at_ms)
     await asyncio.gather(
         send_json(a.ws, to_a_v2),
         send_json(b.ws, to_b_v2),
