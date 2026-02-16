@@ -131,12 +131,14 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 await broadcast_announce(peer_id, session)
 
                 # Send already-connected peers back to the announcing peer
+                # with "youInitiate: true" so this peer knows to send the offer
                 for ep in existing_peers:
                     await send_json(ws, {
                         "type": "announce",
                         "peerId": ep["peerId"],
                         "displayName": ep["displayName"],
                         "timestamp": int(time.time() * 1000),
+                        "youInitiate": True,
                     })
 
             # Route SDP offer to target peer
