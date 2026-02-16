@@ -168,6 +168,37 @@ async def ws_endpoint(ws: WebSocket) -> None:
                     peer_id, to_peer_id, delivered
                 )
 
+            # Route relay data (gossip messages when WebRTC unavailable)
+            elif msg_type == "relay_data" and to_peer_id:
+                await upsert_peer(ws, peer_id)
+                delivered = await route_to_peer(to_peer_id, msg)
+                logger.debug(
+                    "relay_data from=%s to=%s delivered=%s size=%d",
+                    peer_id, to_peer_id, delivered, len(raw),
+                )
+
+            # Broadcast relay data to all peers (gossip protocol)
+            elif msg_type == "relay_broadcast" and peer_id:
+                await upsert_peer(ws, peer_id)
+                relay_msg = {
+                    "type": "relay_data",
+                    "fromPeerId": peer_id,
+                    "toPeerId": "",
+                    "payload": msg.get("payload", ""),
+                }
+                async with peers_lock:
+                    targets = [
+                        p.ws for pid, p in peers.items() if pid != peer_id
+                    ]
+                await asyncio.gather(
+                    *(send_json(t, relay_msg) for t in targets),
+                    return_exceptions=True,
+                )
+                logger.debug(
+                    "relay_broadcast from=%s to=%d peers",
+                    peer_id, len(targets),
+                )
+
     except WebSocketDisconnect:
         pass
     except Exception as exc:
